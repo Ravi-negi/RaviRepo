@@ -51,8 +51,8 @@ jobs:
     # Copy React build into backend
     - name: Copy frontend to backend
       run: |
+        mkdir -p publish/wwwroot
         cp -r demo-ui/build/* publish/wwwroot/
-
     # Save artifact
     - name: Upload artifact
       uses: actions/upload-artifact@v4
