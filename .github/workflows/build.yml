@@ -1,0 +1,61 @@
+name: Build React + .NET App
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # -----------------------
+    # .NET Backend
+    # -----------------------
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Restore
+      run: dotnet restore ./DemoApi
+
+    - name: Build
+      run: dotnet build ./DemoApi --configuration Release
+
+    - name: Publish
+      run: dotnet publish ./DemoApi -c Release -o publish
+
+    # -----------------------
+    # React Frontend
+    # -----------------------
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: |
+        cd demo-ui
+        npm install
+
+    - name: Build React app
+      run: |
+        cd demo-ui
+        npm run build
+
+    # Copy React build into backend
+    - name: Copy frontend to backend
+      run: |
+        cp -r demo-ui/build/* publish/wwwroot/
+
+    # Save artifact
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-package
+        path: publish
