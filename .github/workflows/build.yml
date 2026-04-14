@@ -1,4 +1,4 @@
-name: Build React + .NET App
+name: Build and Deploy to IIS (VM)
 
 on:
   push:
@@ -6,38 +6,47 @@ on:
       - main
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  build-and-deploy:
+    runs-on: self-hosted   # 👈 IMPORTANT (your VM runner)
 
     steps:
+    # -----------------------
+    # Checkout Code
+    # -----------------------
     - name: Checkout code
       uses: actions/checkout@v4
 
     # -----------------------
-    # .NET Backend
+    # Setup .NET
     # -----------------------
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '9.0.x'
 
-    - name: Restore
+    # -----------------------
+    # Build Backend
+    # -----------------------
+    - name: Restore .NET
       run: dotnet restore ./DemoApi
 
-    - name: Build
+    - name: Build .NET
       run: dotnet build ./DemoApi --configuration Release
 
-    - name: Publish
+    - name: Publish .NET
       run: dotnet publish ./DemoApi -c Release -o publish
 
     # -----------------------
-    # React Frontend
+    # Setup Node
     # -----------------------
     - name: Setup Node
       uses: actions/setup-node@v4
       with:
         node-version: '18'
 
+    # -----------------------
+    # Build React App
+    # -----------------------
     - name: Install dependencies
       run: |
         cd demo-ui
@@ -48,24 +57,35 @@ jobs:
         cd demo-ui
         npm run build
 
-    # Copy React build into backend
+    # -----------------------
+    # Copy React build into .NET
+    # -----------------------
     - name: Copy frontend to backend
       run: |
-        mkdir -p publish/wwwroot
-        cp -r demo-ui/build/* publish/wwwroot/
-    # Save artifact
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-package
-        path: publish
+        mkdir publish\wwwroot
+        xcopy demo-ui\build\* publish\wwwroot\ /E /I /Y
 
-           # -----------------------
-    # Deploy to Azure
     # -----------------------
-    - name: Deploy to Azure Web App
-      uses: azure/webapps-deploy@v3
-      with:
-        app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
-        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        package: publish
+    # Deploy to IIS
+    # -----------------------
+    - name: Deploy to IIS
+      run: |
+        powershell -Command "
+        Import-Module WebAdministration;
+
+        if (Get-Website 'MyApp' -ErrorAction SilentlyContinue) {
+            Stop-Website 'MyApp'
+        }
+
+        if (Test-Path 'C:\inetpub\myapp') {
+            Remove-Item 'C:\inetpub\myapp\*' -Recurse -Force
+        } else {
+            New-Item -ItemType Directory -Path 'C:\inetpub\myapp'
+        }
+
+        Copy-Item -Recurse publish\* 'C:\inetpub\myapp\'
+
+        if (Get-Website 'MyApp' -ErrorAction SilentlyContinue) {
+            Start-Website 'MyApp'
+        }
+        "
