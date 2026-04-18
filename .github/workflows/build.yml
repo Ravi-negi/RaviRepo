@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: self-hosted   # 👈 IMPORTANT (your VM runner)
+    runs-on: self-hosted   # 👈 IMPORTANT (your VM runners)
 
     steps:
     # -----------------------
